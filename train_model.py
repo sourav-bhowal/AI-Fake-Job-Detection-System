@@ -5,12 +5,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 import joblib
 import os
+from tqdm import tqdm
 
 # Get the directory where this script is located
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Load dataset from CSV file
-csv_path = os.path.join(SCRIPT_DIR, "Fake Postings.csv")
+csv_path = os.path.join(SCRIPT_DIR, "fake_job_postings.csv")
 print(f"Loading data from: {csv_path}")
 df = pd.read_csv(csv_path)
 
@@ -19,8 +20,9 @@ print(f"Columns: {df.columns.tolist()}")
 print(f"Label distribution:\n{df['fraudulent'].value_counts()}")
 
 # Combine all text fields into a single text column for training
-text_columns = ['title', 'description', 'requirements', 'company_profile', 'location', 
-                'salary_range', 'employment_type', 'industry', 'benefits']
+text_columns = ['title', 'location', 'department', 'salary_range', 'company_profile', 
+                'description', 'requirements', 'benefits', 'employment_type', 
+                'required_experience', 'required_education', 'industry', 'function']
 
 def combine_text(row):
     """Combine all text fields into a single string for NLP processing."""
@@ -30,7 +32,9 @@ def combine_text(row):
             parts.append(str(row[col]))
     return " ".join(parts)
 
-df["text"] = df.apply(combine_text, axis=1)
+print("\nCombining text fields...")
+tqdm.pandas(desc="Processing rows")
+df["text"] = df.progress_apply(combine_text, axis=1)
 
 # Prepare features and labels
 X = df["text"]
@@ -43,19 +47,25 @@ print(f"\nTraining set size: {len(X_train)}")
 print(f"Test set size: {len(X_test)}")
 
 # Preprocess and vectorize text data
-vectorizer = TfidfVectorizer(stop_words="english", max_features=5000, ngram_range=(1, 2))
-X_train_vec = vectorizer.fit_transform(X_train)
-X_test_vec = vectorizer.transform(X_test)
+print("\nVectorizing text...")
+with tqdm(total=2, desc="Vectorization") as pbar:
+    vectorizer = TfidfVectorizer(stop_words="english", max_features=5000, ngram_range=(1, 2))
+    X_train_vec = vectorizer.fit_transform(X_train)
+    pbar.update(1)
+    X_test_vec = vectorizer.transform(X_test)
+    pbar.update(1)
 
 # Train logistic regression model
 print("\nTraining model...")
-model = LogisticRegression(max_iter=1000, random_state=42)
-model.fit(X_train_vec, y_train)
+with tqdm(total=100, desc="Training") as pbar:
+    model = LogisticRegression(max_iter=1000, random_state=42, verbose=0)
+    model.fit(X_train_vec, y_train)
+    pbar.update(100)
 
 # Evaluate the model
 y_pred = model.predict(X_test_vec)
 print("\n=== Model Evaluation ===")
-print(f"Accuracy: {accuracy_score(y_test, y_pred):.4f}")
+print(f"Accuracy: {accuracy_score(y_test, y_pred) * 100:.2f}%")
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred, target_names=["Legitimate", "Scam"]))
 
