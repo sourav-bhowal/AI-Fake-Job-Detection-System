@@ -21,19 +21,38 @@ def scrape_job(url: str):
 
 # Helper function to extract salary from text
 def extract_salary(text):
-    """Extract salary information from text, supporting various formats."""
-    # Try to find salary ranges like $55,000-$100,000 or $55000-$100000
-    range_match = re.search(r'[\$\u20b9]?\s*(\d{1,3}(?:,\d{3})*|\d+)\s*[-\u2013]\s*[\$\u20b9]?\s*(\d{1,3}(?:,\d{3})*|\d+)', text)
-    if range_match:
-        return f"₹{range_match.group(1)}-₹{range_match.group(2)}"
+    """Extract salary information from text, supporting $ and ₹ formats."""
     
-    # Try to find single salary values
-    single_match = re.search(r'[\$\u20b9]\s*(\d{1,3}(?:,\d{3})*|\d{4,})', text)
-    if single_match:
-        return single_match.group(0)
+    # Try Indian formats first: "₹50,000", "Rs. 50000", "INR 50,000", "5 LPA", "5-10 Lakhs"
+    # LPA (Lakhs Per Annum) pattern
+    lpa_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:-\s*(\d+(?:\.\d+)?))?\s*(?:LPA|Lakhs?(?:\s*per\s*annum)?)', text, re.IGNORECASE)
+    if lpa_match:
+        if lpa_match.group(2):
+            return f"₹{lpa_match.group(1)}-{lpa_match.group(2)} LPA"
+        return f"₹{lpa_match.group(1)} LPA"
+    
+    # ₹ or Rs or INR salary ranges: "₹50,000-₹1,00,000" or "Rs 50000 - 100000"
+    inr_range = re.search(r'(?:₹|Rs\.?|INR)\s*(\d{1,3}(?:,\d{2,3})*|\d+)\s*[-\u2013to]+\s*(?:₹|Rs\.?|INR)?\s*(\d{1,3}(?:,\d{2,3})*|\d+)', text, re.IGNORECASE)
+    if inr_range:
+        return f"₹{inr_range.group(1)}-₹{inr_range.group(2)}"
+    
+    # Single ₹ value: "₹50,000" or "Rs. 50000" or "INR 50000"
+    inr_single = re.search(r'(?:₹|Rs\.?|INR)\s*(\d{1,3}(?:,\d{2,3})*|\d{4,})', text, re.IGNORECASE)
+    if inr_single:
+        return f"₹{inr_single.group(1)}"
+    
+    # USD salary ranges: "$55,000-$100,000"
+    usd_range = re.search(r'\$\s*(\d{1,3}(?:,\d{3})*|\d+)\s*[-\u2013]\s*\$?\s*(\d{1,3}(?:,\d{3})*|\d+)', text)
+    if usd_range:
+        return f"${usd_range.group(1)}-${usd_range.group(2)}"
+    
+    # Single USD value
+    usd_single = re.search(r'\$\s*(\d{1,3}(?:,\d{3})*|\d{4,})', text)
+    if usd_single:
+        return usd_single.group(0)
     
     # Try "per week/month/year" patterns
-    period_match = re.search(r'(\d{1,3}(?:,\d{3})*|\d+)\s*(?:per|/)\s*(?:week|month|year|hr|hour)', text, re.IGNORECASE)
+    period_match = re.search(r'(\d{1,3}(?:,\d{3})*|\d+)\s*(?:per|/)\s*(?:week|month|year|hr|hour|annum)', text, re.IGNORECASE)
     if period_match:
         return period_match.group(0)
     
