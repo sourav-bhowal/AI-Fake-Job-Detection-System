@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+scikit-learn
+pandas
+numpy
+beautifulsoup4
+requests
+python-whois
+tldextract
+joblib
